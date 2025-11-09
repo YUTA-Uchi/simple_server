@@ -1,23 +1,20 @@
 CC = cc
 CFLAGS = -Wall -Wextra -O2
-TARGET = calc_server
-OBJS = server.o http_handler.o calc.o
+SRCS_SERVER = server.c http_handler.c calc.c
+SRCS_CLIENT = client.c
+OBJS_SERVER = $(SRCS_SERVER:.c=.o)
+OBJS_CLIENT = $(SRCS_CLIENT:.c=.o)
+OBJS = $(OBJS_SERVER) $(OBJS_CLIENT)
 
-all: $(TARGET)
+all: server client
 
-$(TARGET): $(OBJS)
+server: $(OBJS_SERVER)
 	$(CC) $(CFLAGS) -o $@ $^
 
-server.o: server.c http_handler.h
-	$(CC) $(CFLAGS) -c server.c
-
-http_handler.o: http_handler.c http_handler.h calc.h
-	$(CC) $(CFLAGS) -c http_handler.c
-
-calc.o: calc.c calc.h
-	$(CC) $(CFLAGS) -c calc.c
+client: $(OBJS_CLIENT)
+	$(CC) $(CFLAGS) -o $@ $^
 
 clean:
-	rm -f $(TARGET) $(OBJS)
+	rm -f server client $(OBJS)
 
 .PHONY: all clean

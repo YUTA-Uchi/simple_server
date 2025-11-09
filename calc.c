@@ -1,21 +1,27 @@
-#include "calc.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include "calc.h"
 
-// URLデコード
-static char* url_decode(const char *src) {
+// URLデコード関数
+char* url_decode(const char *src) {
+    if (!src) return NULL;
+    
     size_t len = strlen(src);
     char *decoded = malloc(len + 1);
-    if (!decoded) return NULL;
+    if (!decoded) {
+        perror("malloc");
+        return NULL;
+    }
     
     size_t i = 0, j = 0;
     while (i < len) {
         if (src[i] == '+') {
             decoded[j++] = ' ';
             i++;
-        } else if (src[i] == '%' && i + 2 < len) {
+        } else if (src[i] == '%' && i + 2 < len && 
+                   isxdigit(src[i+1]) && isxdigit(src[i+2])) {
             char hex[3] = {src[i+1], src[i+2], '\0'};
             decoded[j++] = (char)strtol(hex, NULL, 16);
             i += 3;
@@ -27,26 +33,42 @@ static char* url_decode(const char *src) {
     return decoded;
 }
 
-CalcResult calculate_from_query(const char *query) {
-    CalcResult result = {0, 0};
-    
-    if (!query) return result;
+// 計算実行
+int calculate(int num1, char op, int num2, int *result) {
+    switch(op) {
+        case '+': *result = num1 + num2; return 1;
+        case '-': *result = num1 - num2; return 1;
+        case '*': *result = num1 * num2; return 1;
+        case '/': 
+            if (num2 == 0) return 0;
+            *result = num1 / num2;
+            return 1;
+        default: return 0;
+    }
+}
+
+// クエリパラメータから計算式を抽出して計算
+int parse_and_calculate(const char *request, int *result) {
+    if (!request || !result) return 0;
     
     // "query="を探す
-    const char *query_param = strstr(query, "query=");
-    if (!query_param) return result;
+    const char *query_start = strstr(request, "query=");
+    if (!query_start) return 0;
     
-    query_param += 6; // "query="の長さ分スキップ
+    query_start += 6; // "query="の長さ分スキップ
     
-    // スペースまたは改行で終了
-    char *query_value = malloc(strlen(query_param) + 1);
-    if (!query_value) return result;
+    // クエリ値を抽出（スペース、改行、&で終了）
+    char *query_value = malloc(strlen(query_start) + 1);
+    if (!query_value) {
+        perror("malloc");
+        return 0;
+    }
     
     size_t i = 0;
-    while (query_param[i] && query_param[i] != ' ' && 
-           query_param[i] != '\r' && query_param[i] != '\n' &&
-           query_param[i] != '&') {
-        query_value[i] = query_param[i];
+    while (query_start[i] && query_start[i] != ' ' && 
+           query_start[i] != '\r' && query_start[i] != '\n' &&
+           query_start[i] != '&') {
+        query_value[i] = query_start[i];
         i++;
     }
     query_value[i] = '\0';
@@ -54,26 +76,16 @@ CalcResult calculate_from_query(const char *query) {
     // URLデコード
     char *decoded = url_decode(query_value);
     free(query_value);
-    if (!decoded) return result;
+    if (!decoded) return 0;
     
     // 計算式をパース
     int num1, num2;
     char op;
-    if (sscanf(decoded, "%d %c %d", &num1, &op, &num2) == 3) {
-        switch(op) {
-            case '+': result.result = num1 + num2; result.success = 1; break;
-            case '-': result.result = num1 - num2; result.success = 1; break;
-            case '*': result.result = num1 * num2; result.success = 1; break;
-            case '/': 
-                if (num2 != 0) {
-                    result.result = num1 / num2;
-                    result.success = 1;
-                }
-                break;
-            default: break;
-        }
-    }
-    
+    int parsed = sscanf(decoded, "%d %c %d", &num1, &op, &num2);
     free(decoded);
-    return result;
+    
+    if (parsed != 3) return 0;
+    
+    // 計算実行
+    return calculate(num1, op, num2, result);
 }
