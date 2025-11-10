@@ -7,15 +7,15 @@
 #include <netinet/in.h>
 #include <netdb.h>
 
-#define SERVER_PORT 8080
+#define LOCAL_HOST "localhost"
+#define SERVER_PORT "8080"
 #define BUFFER_SIZE 4096
 
 int main(int argc, char *argv[]) {
     int sockfd;
     char *send_buffer = NULL;
     char *recv_buffer = NULL;
-    struct sockaddr_in server_addr;
-    struct hostent *server;
+    struct addrinfo hints, *res;
     const char *query = "2%2B10"; // デフォルト: 2+10
     
     // コマンドライン引数から数式を取得
@@ -34,8 +34,12 @@ int main(int argc, char *argv[]) {
     }
     
     // サーバーをホスト名で取得
-    server = gethostbyname("localhost");
-    if (server == NULL) {
+
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+
+    if (getaddrinfo(LOCAL_HOST, SERVER_PORT, &hints, &res) != 0) {
         fprintf(stderr, "ERROR, no such host\n");
         free(send_buffer);
         free(recv_buffer);
@@ -43,7 +47,7 @@ int main(int argc, char *argv[]) {
     }
     
     // ソケット作成
-    sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
     if (sockfd < 0) {
         perror("socket");
         free(send_buffer);
@@ -51,14 +55,8 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
     
-    // サーバーアドレス構造体の設定
-    memset(&server_addr, 0, sizeof(server_addr));
-    server_addr.sin_family = AF_INET;
-    memcpy(&server_addr.sin_addr.s_addr, server->h_addr, server->h_length);
-    server_addr.sin_port = htons(SERVER_PORT);
-    
     // サーバーに接続
-    if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+    if (connect(sockfd, res->ai_addr, res->ai_addrlen) < 0) {
         perror("connect");
         close(sockfd);
         free(send_buffer);
@@ -107,6 +105,7 @@ int main(int argc, char *argv[]) {
     
     // クリーンアップ
     close(sockfd);
+    freeaddrinfo(res);
     free(send_buffer);
     free(recv_buffer);
     return EXIT_SUCCESS;
