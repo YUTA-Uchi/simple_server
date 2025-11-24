@@ -18,7 +18,7 @@ char* url_decode(const char *src) {
     size_t i = 0, j = 0;
     while (i < len) {
         if (src[i] == '+') {
-            decoded[j++] = ' ';
+            decoded[j++] = '+';
             i++;
         } else if (src[i] == '%' && i + 2 < len && 
                    isxdigit(src[i+1]) && isxdigit(src[i+2])) {
